@@ -57,11 +57,10 @@ const portfolioData = {
       live: 'https://enigma50-aasra.vercel.app', image: 'assets/projects/aasra.png', imageWidth: 1450, imageHeight: 795, recognition: 'Enigma 5.0 finalist'
     },
     {
-      id: 'smaraka', name: 'Smaraka', categories: ['Computer Vision', 'Web & Backend'],
+      id: 'smaraka', name: 'Smaraka', categories: ['Computer Vision', 'Web & Backend'], repoPrivate: true,
       description: 'AI-assisted web app that scans photos of Indian heritage monuments, detects visible deterioration with classical computer vision, and generates downloadable PDF preservation reports.',
       cardText: 'A computer-vision scanner that turns monument photos into preservation reports.',
       stack: ['Python', 'FastAPI', 'OpenCV', 'scikit-image'], role: 'solo project',
-      github: 'https://github.com/GrahitShetty-lab/Smaraka-AI-Heritage-Preservation-Scanner-',
       live: 'https://smaraka-ai-heritage-preservation-scanner-ica576krc.vercel.app/', image: 'assets/projects/smaraka.png', imageWidth: 1919, imageHeight: 933
     },
     {
@@ -74,19 +73,17 @@ const portfolioData = {
       gallery: ['assets/projects/bi2s3ense-dashboard.png']
     },
     {
-      id: 'edgefusion', name: 'EdgeFusion', categories: ['IoT'],
+      id: 'edgefusion', name: 'EdgeFusion', categories: ['IoT'], repoPrivate: true,
       description: 'MicroPython ESP32 prototype for local fire, gas and motion safety monitoring with offline peer-to-peer alerts. Student prototype, not a certified life-safety system.',
       cardText: 'An ESP32 safety-monitoring prototype with offline peer-to-peer alerts.',
       stack: ['ESP32', 'MicroPython', 'Python', 'database', 'Render'], role: 'built the dashboard for the sensors',
-      github: 'https://github.com/GrahitShetty-lab/mini-proj',
       live: 'https://mini-proj-haz7.onrender.com/dashboard/', image: 'assets/projects/edgefusion.png', imageWidth: 1919, imageHeight: 854
     },
     {
-      id: 'finance-analyzer', name: 'Finance Analyzer', categories: ['Web & Backend'],
+      id: 'finance-analyzer', name: 'Finance Analyzer', categories: ['Web & Backend'], repoPrivate: true,
       description: 'Web app for tracking expenses and surfacing automatic spending insights from a CSV upload.',
       cardText: 'A CSV-powered expense tracker that surfaces automatic spending insights.',
       stack: ['Python', 'CSV', 'SQL'], role: 'solo project',
-      github: 'https://github.com/GrahitShetty-lab/Finance_Analyzer',
       live: 'https://finance-analyzer-eta.vercel.app/', image: 'assets/projects/finance-analyzer.png', imageWidth: 1895, imageHeight: 955
     }
   ],
@@ -264,16 +261,275 @@ const portfolioData = {
     }, { passive: true });
   }
 
-  function setupMagneticContact() {
-    if (reducedMotion || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-    const button = document.querySelector('.contact-cta');
-    button.addEventListener('pointermove', (event) => {
-      const rect = button.getBoundingClientRect();
-      const x = event.clientX - rect.left - rect.width / 2;
-      const y = event.clientY - rect.top - rect.height / 2;
-      button.style.transform = `translate(${x * .12}px, ${y * .18}px)`;
+  function setupDesktopPointerEffects() {
+    const fineHover = window.matchMedia('(min-width: 901px) and (hover: hover) and (pointer: fine)');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (!fineHover.matches || reduced.matches) return;
+
+    const hero = document.querySelector('.hero');
+    const portrait = hero?.querySelector('.portrait-image');
+    const outlinedName = hero?.querySelector('.outline-word');
+    const solidName = hero?.querySelector('.solid-word');
+    if (!hero || !portrait || !outlinedName || !solidName) return;
+
+    const cursorDot = document.createElement('div');
+    cursorDot.className = 'custom-cursor-dot';
+    cursorDot.setAttribute('aria-hidden', 'true');
+    const cursorRing = document.createElement('div');
+    cursorRing.className = 'custom-cursor-ring';
+    cursorRing.setAttribute('aria-hidden', 'true');
+    const cursorLabel = document.createElement('span');
+    cursorLabel.className = 'custom-cursor-label';
+    cursorRing.append(cursorLabel);
+    document.body.append(cursorDot, cursorRing);
+
+    const magnetSelector = '.hero-copy .button, .contact-cta, .topbar-link, .social-stack a, .contact-pill, .nav-link';
+    const magnets = [...document.querySelectorAll(magnetSelector)].map((element) => ({
+      element,
+      fixedHeader: Boolean(element.closest('.topbar')),
+      currentX: 0,
+      currentY: 0,
+      targetX: 0,
+      targetY: 0,
+      centerX: 0,
+      centerY: 0
+    }));
+    const pointer = { clientX: 0, clientY: 0, pageX: 0, pageY: 0, active: false, nativeZone: null, hoverTarget: null };
+    const cursor = { x: 0, y: 0, ringX: 0, ringY: 0, scale: 1, targetScale: 1, visible: false, keyboard: false, view: false };
+    const heroBounds = { left: 0, top: 0, width: 1, height: 1 };
+    let frame = 0;
+    let selectionActive = false;
+
+    function refreshGeometry() {
+      const heroRect = hero.getBoundingClientRect();
+      heroBounds.left = heroRect.left + window.scrollX;
+      heroBounds.top = heroRect.top + window.scrollY;
+      heroBounds.width = Math.max(1, heroRect.width);
+      heroBounds.height = Math.max(1, heroRect.height);
+      magnets.forEach((magnet) => {
+        const rect = magnet.element.getBoundingClientRect();
+        magnet.centerX = rect.left + rect.width / 2 + (magnet.fixedHeader ? 0 : window.scrollX);
+        magnet.centerY = rect.top + rect.height / 2 + (magnet.fixedHeader ? 0 : window.scrollY);
+      });
+    }
+
+    function setNativeZone(element, kind) {
+      if (pointer.nativeZone) pointer.nativeZone.classList.remove('cursor-native-text', 'cursor-native-control');
+      pointer.nativeZone = element || null;
+      if (element) element.classList.add(kind === 'control' ? 'cursor-native-control' : 'cursor-native-text');
+      cursorRing.classList.toggle('is-suspended', Boolean(element) || selectionActive);
+      cursorDot.classList.toggle('is-suspended', Boolean(element) || selectionActive);
+    }
+
+    function setHoverTarget(target) {
+      pointer.hoverTarget = target;
+      const interactive = target?.closest('a, button, [role="button"]');
+      const privateLabel = target?.closest('.private-repo');
+      const textZone = interactive ? null : target?.closest('input, textarea, select, [contenteditable="true"], p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption');
+      if (privateLabel) {
+        setNativeZone(privateLabel, 'control');
+      } else if (textZone) {
+        const kind = /^(INPUT|TEXTAREA|SELECT)$/.test(textZone.tagName) || textZone.isContentEditable ? 'control' : 'text';
+        setNativeZone(textZone, kind);
+      } else {
+        setNativeZone(null);
+      }
+
+      const overProject = Boolean(target?.closest('.project-card'));
+      const isInteractive = Boolean(interactive && !privateLabel);
+      cursor.view = overProject && !pointer.nativeZone;
+      cursor.targetScale = cursor.view ? 1.58 : isInteractive ? 1.38 : 1;
+      cursorLabel.textContent = cursor.view ? 'View' : '';
+      cursorRing.classList.toggle('is-view', cursor.view);
+      cursorRing.classList.toggle('is-interactive', isInteractive && !cursor.view);
+      startFrame();
+    }
+
+    function setHeroTarget(pageX, pageY) {
+      const nx = Math.max(-1, Math.min(1, ((pageX - heroBounds.left) / heroBounds.width) * 2 - 1));
+      const ny = Math.max(0, Math.min(1, (pageY - heroBounds.top) / heroBounds.height));
+      hero.style.setProperty('--parallax-portrait-x', `${nx * 3}px`);
+      hero.style.setProperty('--parallax-portrait-y', `${-ny * 12}px`);
+      hero.style.setProperty('--parallax-outline-x', `${-nx * 8}px`);
+      hero.style.setProperty('--parallax-outline-y', `${(ny - .5) * 8}px`);
+      hero.style.setProperty('--parallax-solid-x', `${nx * 5}px`);
+      hero.style.setProperty('--parallax-solid-y', `${(.5 - ny) * 5}px`);
+    }
+
+    function updateMagnetTargets() {
+      const pointerX = pointer.pageX;
+      const pointerY = pointer.pageY;
+      magnets.forEach((magnet) => {
+        if (magnet.fixedHeader && magnet.element.closest('.topbar')?.classList.contains('is-hidden')) {
+          magnet.targetX = 0;
+          magnet.targetY = 0;
+          return;
+        }
+        const x = pointerX - magnet.centerX;
+        const y = pointerY - magnet.centerY;
+        const distance = Math.hypot(x, y);
+        const radius = 118;
+        const pull = distance < radius && distance > 0 ? 8 * (1 - distance / radius) ** 2 : 0;
+        magnet.targetX = distance ? (x / distance) * pull : 0;
+        magnet.targetY = distance ? (y / distance) * pull : 0;
+      });
+    }
+
+    function setPointerPosition(event) {
+      pointer.clientX = event.clientX;
+      pointer.clientY = event.clientY;
+      pointer.pageX = event.clientX + window.scrollX;
+      pointer.pageY = event.clientY + window.scrollY;
+      pointer.active = true;
+      cursor.visible = true;
+      cursor.keyboard = false;
+      cursor.x = pointer.clientX;
+      cursor.y = pointer.clientY;
+      cursorDot.classList.add('is-visible');
+      cursorRing.classList.add('is-visible');
+      document.body.classList.add('has-custom-cursor');
+      setHeroTarget(pointer.pageX, pointer.pageY);
+      updateMagnetTargets();
+    }
+
+    function handlePointerMove(event) {
+      if (event.pointerType !== 'mouse' || !fineHover.matches || reduced.matches || document.hidden) return;
+      if (!document.body.classList.contains('has-custom-cursor')) setPointerPosition(event);
+      else {
+        pointer.clientX = event.clientX;
+        pointer.clientY = event.clientY;
+        pointer.pageX = event.clientX + window.scrollX;
+        pointer.pageY = event.clientY + window.scrollY;
+        pointer.active = true;
+        cursor.visible = true;
+        cursor.keyboard = false;
+        cursor.x = pointer.clientX;
+        cursor.y = pointer.clientY;
+        setHeroTarget(pointer.pageX, pointer.pageY);
+        updateMagnetTargets();
+      }
+      if (pointer.hoverTarget) setHoverTarget(pointer.hoverTarget);
+      startFrame();
+    }
+
+    function handleFocusIn(event) {
+      const target = event.target.closest?.('a, button, [role="button"], input, textarea, select, [tabindex]');
+      if (!target) return;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable) {
+        setNativeZone(target, 'control');
+        return;
+      }
+      const rect = target.getBoundingClientRect();
+      cursor.x = rect.left + rect.width / 2;
+      cursor.y = rect.top + rect.height / 2;
+      cursor.visible = true;
+      cursor.keyboard = true;
+      cursor.targetScale = 1.35;
+      cursorRing.classList.remove('is-suspended');
+      cursorRing.classList.add('is-visible', 'is-keyboard');
+      cursorDot.classList.remove('is-visible');
+      startFrame();
+    }
+
+    function handleFocusOut() {
+      window.setTimeout(() => {
+        if (document.activeElement?.matches?.('a, button, [role="button"], [tabindex], input, textarea, select')) return;
+        cursor.keyboard = false;
+        cursor.visible = pointer.active;
+        cursorRing.classList.remove('is-keyboard');
+        cursorRing.classList.toggle('is-visible', pointer.active && !pointer.nativeZone && !selectionActive);
+        cursorDot.classList.toggle('is-visible', pointer.active && !pointer.nativeZone && !selectionActive);
+        cursor.targetScale = 1;
+        startFrame();
+      }, 0);
+    }
+
+    function handleSelectionChange() {
+      selectionActive = Boolean(window.getSelection()?.toString());
+      document.body.classList.toggle('has-text-selection', selectionActive);
+      cursorRing.classList.toggle('is-suspended', selectionActive || Boolean(pointer.nativeZone));
+      cursorDot.classList.toggle('is-suspended', selectionActive || Boolean(pointer.nativeZone));
+    }
+
+    function handlePointerLeave() {
+      pointer.active = false;
+      document.body.classList.remove('has-custom-cursor');
+      cursor.visible = false;
+      cursorDot.classList.remove('is-visible');
+      if (!cursor.keyboard) cursorRing.classList.remove('is-visible');
+      if (pointer.nativeZone) setNativeZone(null);
+      hero.style.setProperty('--parallax-portrait-x', '0px');
+      hero.style.setProperty('--parallax-portrait-y', '0px');
+      hero.style.setProperty('--parallax-outline-x', '0px');
+      hero.style.setProperty('--parallax-outline-y', '0px');
+      hero.style.setProperty('--parallax-solid-x', '0px');
+      hero.style.setProperty('--parallax-solid-y', '0px');
+      magnets.forEach((magnet) => { magnet.targetX = 0; magnet.targetY = 0; });
+      cursor.targetScale = 1;
+      startFrame();
+    }
+
+    function animateFrame() {
+      frame = 0;
+      if (document.hidden || reduced.matches || !fineHover.matches) return;
+      const ease = (current, target, amount = .18) => current + (target - current) * amount;
+      cursor.ringX = ease(cursor.ringX, cursor.x, .19);
+      cursor.ringY = ease(cursor.ringY, cursor.y, .19);
+      cursor.scale = ease(cursor.scale, cursor.targetScale, .2);
+      cursorDot.style.setProperty('--cursor-x', `${cursor.x}px`);
+      cursorDot.style.setProperty('--cursor-y', `${cursor.y}px`);
+      cursorRing.style.setProperty('--cursor-x', `${cursor.ringX}px`);
+      cursorRing.style.setProperty('--cursor-y', `${cursor.ringY}px`);
+      cursorRing.style.setProperty('--cursor-scale', cursor.scale.toFixed(3));
+
+      let moving = Math.abs(cursor.ringX - cursor.x) > .15 || Math.abs(cursor.ringY - cursor.y) > .15 || Math.abs(cursor.scale - cursor.targetScale) > .005;
+      magnets.forEach((magnet) => {
+        magnet.currentX = ease(magnet.currentX, magnet.targetX, .2);
+        magnet.currentY = ease(magnet.currentY, magnet.targetY, .2);
+        magnet.element.style.translate = `${magnet.currentX.toFixed(2)}px ${magnet.currentY.toFixed(2)}px`;
+        if (Math.abs(magnet.currentX - magnet.targetX) > .08 || Math.abs(magnet.currentY - magnet.targetY) > .08) moving = true;
+      });
+      if (moving) frame = requestAnimationFrame(animateFrame);
+    }
+
+    function startFrame() {
+      if (!frame && !document.hidden && !reduced.matches && fineHover.matches) frame = requestAnimationFrame(animateFrame);
+    }
+
+    refreshGeometry();
+    window.addEventListener('resize', refreshGeometry, { passive: true });
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('pointerleave', handlePointerLeave, { passive: true });
+    document.addEventListener('pointerover', (event) => {
+      if (event.pointerType !== 'mouse' || !fineHover.matches || reduced.matches) return;
+      if (!document.body.classList.contains('has-custom-cursor')) setPointerPosition(event);
+      setHoverTarget(event.target);
+    }, { passive: true });
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    hero.addEventListener('pointerenter', (event) => {
+      if (event.pointerType !== 'mouse') return;
+      setHeroTarget(event.clientX + window.scrollX, event.clientY + window.scrollY);
+      startFrame();
+    }, { passive: true });
+    hero.addEventListener('pointerleave', () => {
+      hero.style.setProperty('--parallax-portrait-x', '0px');
+      hero.style.setProperty('--parallax-portrait-y', '0px');
+      hero.style.setProperty('--parallax-outline-x', '0px');
+      hero.style.setProperty('--parallax-outline-y', '0px');
+      hero.style.setProperty('--parallax-solid-x', '0px');
+      hero.style.setProperty('--parallax-solid-y', '0px');
+      startFrame();
+    }, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      } else if (!document.hidden && (pointer.active || cursor.keyboard)) {
+        startFrame();
+      }
     });
-    button.addEventListener('pointerleave', () => { button.style.transform = ''; });
   }
 
   function bindServiceAccordion(section) {
@@ -404,12 +660,15 @@ const portfolioData = {
   function projectCard(project, index) {
     const chips = project.stack.map((item) => `<span class="tag-chip">${item}</span>`).join('');
     const cats = project.categories.join(' · ');
+    const repositoryLink = project.repoPrivate
+      ? '<span class="tag-chip private-repo" aria-label="Private repository"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="7" rx="1.5"/><path d="M5.25 7V5a2.75 2.75 0 0 1 5.5 0v2"/></svg>Private repo</span>'
+      : `<a href="${project.github}" target="_blank" rel="noopener">GitHub ↗</a>`;
     return `<article class="project-card" data-project="${project.id}" data-categories="${project.categories.join('|')}" style="--card-index:${index}">
       <button class="project-card-button" type="button" data-open-project="${project.id}" aria-label="View ${project.name} project details">
         <span class="project-art"><img src="${project.image}" alt="${project.name} project screenshot" width="${project.imageWidth}" height="${project.imageHeight}" loading="lazy"><span class="project-placeholder"><small>PROJECT PREVIEW</small><strong>${project.name}</strong></span>${project.badge ? `<span class="project-badge">${project.badge}</span>` : ''}${project.recognition ? `<span class="project-recognition">${project.recognition}</span>` : ''}<span class="project-open" aria-hidden="true">↗</span></span>
         <span class="project-card-info"><span class="project-info-top"><span class="project-title">${project.name}</span><span class="project-role">${project.role}</span></span><span class="project-one-line">${project.cardText}</span><span class="project-tags">${chips}</span></span>
       </button>
-      <div class="project-card-links"><span class="project-categories">${cats}</span><span><a href="${project.github}" target="_blank" rel="noopener">GitHub ↗</a><a href="${project.live}" target="_blank" rel="noopener">Live ↗</a></span></div>
+      <div class="project-card-links"><span class="project-categories">${cats}</span><span>${repositoryLink}<a href="${project.live}" target="_blank" rel="noopener">Live &rarr;</a></span></div>
     </article>`;
   }
 
@@ -460,6 +719,20 @@ const portfolioData = {
     live: document.querySelector('.detail-live'), github: document.querySelector('.detail-github'), image: document.querySelector('.detail-image'),
     placeholder: document.querySelector('.preview-placeholder'), preview: document.querySelector('.detail-preview'), caption: document.querySelector('.preview-caption'), gallery: document.querySelector('.detail-gallery'), award: document.querySelector('.detail-award')
   };
+  detail.privateRepo = document.createElement('span');
+  detail.privateRepo.className = 'tag-chip private-repo detail-private-repo';
+  detail.privateRepo.tabIndex = 0;
+  detail.privateRepo.setAttribute('role', 'note');
+  detail.privateRepo.setAttribute('aria-label', 'Private repository');
+  detail.privateRepo.setAttribute('aria-describedby', 'private-repo-help');
+  detail.privateRepo.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="7" rx="1.5"/><path d="M5.25 7V5a2.75 2.75 0 0 1 5.5 0v2"/></svg>Private repo';
+  detail.privateRepo.hidden = true;
+  detail.privateRepoHelp = document.createElement('p');
+  detail.privateRepoHelp.className = 'private-repo-help';
+  detail.privateRepoHelp.id = 'private-repo-help';
+  detail.privateRepoHelp.textContent = 'Source code is private. Available on request.';
+  detail.privateRepoHelp.hidden = true;
+  detail.github.after(detail.privateRepo, detail.privateRepoHelp);
   function openProject(project, updateHash = true) {
     if (!project || !dialog) return;
     detail.title.textContent = project.name;
@@ -467,7 +740,11 @@ const portfolioData = {
     detail.categories.textContent = project.categories.join(' / ');
     detail.stack.innerHTML = project.stack.map((item) => `<span class="tag-chip">${item}</span>`).join('');
     detail.role.textContent = project.role;
-    detail.live.href = project.live; detail.github.href = project.github;
+    detail.live.href = project.live;
+    detail.github.hidden = Boolean(project.repoPrivate);
+    detail.privateRepo.hidden = !project.repoPrivate;
+    detail.privateRepoHelp.hidden = !project.repoPrivate;
+    if (!project.repoPrivate) detail.github.href = project.github;
     detail.image.hidden = true; detail.image.src = project.image; detail.image.alt = `${project.name} project preview`;
     detail.image.width = project.imageWidth; detail.image.height = project.imageHeight;
     detail.award.textContent = project.recognition || '';
@@ -504,7 +781,7 @@ const portfolioData = {
   renderContentSections();
   renderProjects();
   setupNavigation();
-  setupMagneticContact();
+  setupDesktopPointerEffects();
   setupFallbackReveals();
   if (!reducedMotion) loadMotionLibraries().then(setupSmoothScroll).catch(() => {});
 })();
