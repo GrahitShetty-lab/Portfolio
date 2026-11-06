@@ -19,4 +19,4 @@ Update the `portfolioData` object near the top of `js/main.js`. It contains the 
 ## Deploy
 
 - **GitHub Pages:** push the files to a repository, then select the branch and root folder in the repository's Pages settings.
-- **Vercel:** import the repository, choose the **Other** framework preset, leave the build command empty, and use `.` as the output directory.
+
